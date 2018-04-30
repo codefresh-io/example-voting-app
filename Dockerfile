@@ -1,3 +1,4 @@
 FROM python:3.4-alpine
 
-RUN pip install selenium pytest pytest-html
+RUN apk add bash && \
+    pip install selenium pytest pytest-html
