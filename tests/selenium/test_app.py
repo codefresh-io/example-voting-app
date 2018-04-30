@@ -16,9 +16,16 @@ ip = os.getenv('IP')
 # Give Selenium Hub time to start
 time.sleep(15)  # TODO: figure how to do this better
 
+def pytest_addoption(parser):
+    parser.addoption("--browser", action="store", default="",
+        help="Specify browser")
+
 @pytest.fixture(scope='module')
+
+def browser_name(request):
+    request.cls.browser_name = request.config.getoption("--browser_name")
+
 def browser():
-    browser_name = sys.argv[5]
     browser = webdriver.Remote(
         command_executor='http://selenium_hub:4444/wd/hub',
         desired_capabilities={'browserName': browser_name},
