@@ -2,15 +2,18 @@ import os
 import time
 
 import pytest
+
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import (
+    InvalidSelectorException,
+    NoSuchElementException,
+    WebDriverException)
 
 ip = os.getenv('IP')
 
 # Give Selenium Hub time to start
 time.sleep(15)  # TODO: figure how to do this better
-
 
 @pytest.fixture(scope='module')
 def browser():
@@ -29,14 +32,17 @@ def test_confirm_title(browser):
 
 def test_confirm_choice_form(browser):
     browser.get("http://{}:80".format(ip))
-    assert browser.find_element_by_id('choice') == 'choice'
+    element = browser.find_element(By.ID, 'choice')
+    assert element.get_attribute('id') == 'choice'
 
 
 def test_confirm_button_a(browser):
     browser.get("http://{}:80".format(ip))
-    assert browser.find_element_by_id('a') == 'a'
+    element = browser.find_element(By.ID, 'a')
+    assert element.get_attribute('id') == 'a'
 
 
 def test_confirm_button_b(browser):
     browser.get("http://{}:80".format(ip))
-    assert browser.find_element_by_id('b') == 'b'
+    element = browser.find_element(By.ID, 'b')
+    assert element.get_attribute('id') == 'b'
