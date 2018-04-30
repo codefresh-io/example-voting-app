@@ -29,12 +29,14 @@ def test_confirm_title(browser):
 
 def test_confirm_choice_form(browser):
     browser.get("http://{}:80".format(ip))
-    assert browser.find_element_by_id('choice').isDisplayed()
+    assert browser.find_element_by_id('choice') == 'choice'
+
 
 def test_confirm_button_a(browser):
     browser.get("http://{}:80".format(ip))
-    assert browser.find_element_by_id('a').isDisplayed()
+    assert browser.find_element_by_id('a') == 'a'
+
 
 def test_confirm_button_b(browser):
     browser.get("http://{}:80".format(ip))
-    assert browser.find_element_by_id('b').isDisplayed()
+    assert browser.find_element_by_id('b') == 'b'
