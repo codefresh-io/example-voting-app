@@ -1,8 +1,8 @@
 import os
 import time
-import sys
 
 import pytest
+import sys
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -12,13 +12,13 @@ from selenium.common.exceptions import (
     WebDriverException)
 
 ip = os.getenv('IP')
-browser_name = sys.argv[1]
 
 # Give Selenium Hub time to start
 time.sleep(15)  # TODO: figure how to do this better
 
 @pytest.fixture(scope='module')
-def browser(browser_name):
+def browser():
+    browser_name = sys.argv[1]
     browser = webdriver.Remote(
         command_executor='http://selenium_hub:4444/wd/hub',
         desired_capabilities={'browserName': browser_name},
