@@ -97,7 +97,16 @@ steps:
         environment:
           VOTE_ENDPOINT_IP: ${{VOTE_ENDPOINT_IP}}
           RESULT_ENDPOINT_IP: ${{RESULT_ENDPOINT_IP}}
-        command: bash -c 'IFS=" " read -a browserarray <<< "${{BROWSERS}}" && for browser in "$${browserarray[@]}"; do BROWSER=$$browser python -m pytest -vvv --html=${{CF_BUILD_ID}}-report-$${browser}.html --self-contained-html ${{CF_VOLUME_PATH}}/${{CF_REPO_NAME}}/tests/selenium/test_app.py ; done'
+        command: bash -c 'IFS=" " read -a browserarray <<< "${{BROWSERS}}" && for browser in "$${browserarray[@]}"; do BROWSER=$$browser python -m pytest -vvv --html=report-$${browser}.html --self-contained-html ${{CF_VOLUME_PATH}}/${{CF_REPO_NAME}}/tests/selenium/test_app.py; done'
         volumes:
           - '${{CF_VOLUME_NAME}}:/codefresh/volume'
     add_flow_volume_to_composition: true
+  ArchiveDVTs:
+    image: mesosphere/aws-cli
+    commands:
+      - bash -c 'IFS=" " read -a browserarray <<< "${{BROWSERS}}" && for browser in "${browserarray[@]}"; do BROWSER=$browser aws s3 cp ./report-${browser}.html s3://${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}/report-${browser}.html; done'
+    on_success:
+     metadata:
+        set:
+          - ${{BuildingTestDockerImage.imageId}}:
+              - SELENIUM_DVTS: "https://s3.${{AWS_DEFAULT_REGION}}.amazonaws.com/${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}.txt"
