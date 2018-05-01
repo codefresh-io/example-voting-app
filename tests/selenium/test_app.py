@@ -61,18 +61,18 @@ def test_vote_click(browser):
 
 def test_confirm_result_title(browser):
     browser.get("http://{}:80".format(result_endpoint_ip))
-    assert "Cats vs Dogs!" in browser.title
+    assert "Cats vs Dogs -- Result" in browser.title
 
 
 def test_confirm_result_cats(browser):
     browser.get("http://{}:80".format(result_endpoint_ip))
-    element = browser.find_element(By.CLASS_NAME, 'choice cats')
+    element = browser.find_element(By.CLASS, 'choice cats')
     assert element.is_displayed() is True
 
 
 def test_confirm_result_dogs(browser):
     browser.get("http://{}:80".format(result_endpoint_ip))
-    element = browser.find_element(By.CLASS_NAME, 'choice dogs')
+    element = browser.find_element(By.CLASS, 'choice dogs')
     assert element.is_displayed() is True
 
 
@@ -85,4 +85,4 @@ def test_confirm_result(browser):
 def test_confirm_result_vote_tally(browser):
     browser.get("http://{}:80".format(result_endpoint_ip))
     element = browser.find_element(By.ID, 'result')
-    assert 'No votes' in element.text
+    assert 'no votes' not in element.text
