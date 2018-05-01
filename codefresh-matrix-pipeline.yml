@@ -10,7 +10,8 @@
 # Pipeline IDs for the pipelines for 3 microservices (Shown in curl webhook command on pipeline page in Configuration > General Settings)
 # Create KUBE_CONTEXT variables with Codefresh friendly name given to your Kubernetes Cluster
 # Create KUBE_NAMESPACE variable with Kubernetes namespace for Release
-# TODO Turn into README
+# Create HELM_RELEASE_NAME variables with Helm Release Name
+# Create BROWSERS variable with space delimited supported browsers 'chrome firefox'
 version: '1.0'
 steps:
   BuildMicroServices:
@@ -22,11 +23,11 @@ steps:
       - bash -c 'IFS=" " read -a pipelineidsarray <<< "${{PARALLEL_PIPELINES_IDS}}" && for id in "${pipelineidsarray[@]}"; do buildids="$buildids $(codefresh run $id -b=${{CF_BRANCH}} -d)"; done && codefresh wait $buildids'
   HelmUpgrade:
     title: Helm Upgrade
-    image: codefresh/plugin-helm:2.8.0 # You need to make sure you've set this to the correct version of Tiller installed on your helm init
+    image: codefresh/cfstep-helm:2.8.0 # You need to make sure you've set this to the correct version of Tiller installed on your helm init
     working_directory: ./
     environment:
       - CHART_NAME=./helm/
-      - RELEASE_NAME=example-voting-app
+      - RELEASE_NAME=${{HELM_RELEASE_NAME}} # Updated for Seleniun
       - KUBE_CONTEXT=${{KUBE_CONTEXT}}
       - NAMESPACE=${{KUBE_NAMESPACE}}
       - DEBUG_CHART=true
@@ -39,3 +40,63 @@ steps:
       - custom_worker_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-worker
       - custom_worker_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
       - custom_worker_image_pullSecret=${{KUBE_PULL_SECRET}}
+  GetServicesEndpoints:
+    title: Getting Kubernetes Endpoints
+    image: codefresh/cfstep-helm:2.8.0
+    commands:
+      - bash -c 'external_ip=""; while [ -z $external_ip ]; do echo "Waiting for end point..."; external_ip=$(kubectl get svc ${{HELM_RELEASE_NAME}}-vote --namespace ${{KUBE_NAMESPACE}} --template="{{range .status.loadBalancer.ingress}}{{.ip}}{{end}}"); [ -z "$external_ip" ] && sleep 10; done; echo "End point ready-" && echo $external_ip; cf_export IP=$external_ip'
+  BuildingTestDockerImage:
+    title: Building Test Docker Image
+    type: build
+    image_name: codefresh/example-voting-app-tests
+    working_directory: ./
+    dockerfile: Dockerfile
+    tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+  PostDeploymentTests:
+    title: Functional Tests
+    type: composition
+    composition:
+      version: '2'
+      services:
+        selenium_hub:
+          image: selenium/hub
+          ports:
+            - 4444
+          environment:
+            - SE_OPTS=-debug
+            - GRID_MAX_SESSION=5
+        chrome_node:
+          image: selenium/node-chrome
+          ports:
+            - 5900
+            - 5555
+          command: bash -c "sleep 5 && /opt/bin/entry_point.sh"
+          depends_on: 
+            - selenium_hub
+          environment:
+            - HUB_HOST=selenium_hub
+            - REMOTE_HOST=http://chrome_node:5555
+            - NODE_MAX_SESSION=5
+            - NODE_MAX_INSTANCES=5
+        firefox_node:
+          image: selenium/node-firefox
+          ports:
+            - 5900
+            - 5555
+          command: bash -c "sleep 5 && /opt/bin/entry_point.sh"
+          depends_on: 
+            - selenium_hub
+          environment:
+            - HUB_HOST=selenium_hub
+            - REMOTE_HOST=http://firefox_node:5555
+            - NODE_MAX_SESSION=5
+            - NODE_MAX_INSTANCES=5
+    composition_candidates:
+      test:
+        image: 'r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-tests:${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+        environment:
+          IP: ${{IP}}
+        command: bash -c 'IFS=" " read -a browserarray <<< "${{BROWSERS}}" && for browser in "$${browserarray[@]}"; do BROWSER=$$browser python -m pytest -vvv --html=${{CF_BUILD_ID}}-report-"$$browser".html --self-contained-html ${{CF_VOLUME_PATH}}/${{CF_REPO_NAME}}/tests/selenium/test_app.py ; done'
+        volumes:
+          - '${{CF_VOLUME_NAME}}:/codefresh/volume'
+    add_flow_volume_to_composition: true
