@@ -52,8 +52,8 @@ steps:
     working_directory: ./
     dockerfile: Dockerfile
     tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
-  PostDeploymentTests:
-    title: Running Selenium Post Deployment Tests
+  PostDeploymentVerificationTests:
+    title: Running Selenium DVTs
     type: composition
     composition:
       version: '2'
