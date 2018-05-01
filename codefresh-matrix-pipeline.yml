@@ -105,6 +105,7 @@ steps:
     image: mesosphere/aws-cli
     commands:
       - apk update
+      - apk upgrade
       - apk add bash
       - bash -c 'IFS=" " read -a browserarray <<< "${{BROWSERS}}" && for browser in "${browserarray[@]}"; do BROWSER=$browser aws s3 cp ./report-${browser}.html s3://${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}/selenium-report-${browser}.html; done'
     on_success:
