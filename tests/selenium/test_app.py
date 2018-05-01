@@ -64,12 +64,6 @@ def test_confirm_result_title(browser):
     assert "Cats vs Dogs -- Result" in browser.title
 
 
-def test_confirm_result_labels_exist(browser):
-    browser.get("http://{}:80".format(result_endpoint_ip))
-    elements = browser.find_element(By.CLASS_NAME, 'label')
-    assert len(elements) > 1
-
-
 def test_confirm_result(browser):
     browser.get("http://{}:80".format(result_endpoint_ip))
     element = browser.find_element(By.ID, 'result')
