@@ -102,6 +102,16 @@ steps:
         volumes:
           - '${{CF_VOLUME_NAME}}:/codefresh/volume'
     add_flow_volume_to_composition: true
+    on_success:
+      metadata:
+        set:
+          - '${{BuildingTestDockerImage.imageId}}':
+              - SELENIUM_DVTS: true
+    on_fail:
+      metadata:
+        set:
+          - '${{BuildingTestDockerImage.imageId}}':
+              - SELENIUM_DVTS: false
   ArchiveSeleniumDVTReports:
     title: Archiving Selenium DVT Reports
     image: mesosphere/aws-cli
