@@ -2,6 +2,9 @@ Setting up Example Voting App in Codefresh
 =========
 [![Codefresh build status]( https://g.codefresh.io/api/badges/build?repoOwner=codefresh-io&repoName=example-voting-app&branch=master&pipelineName=example-voting-app-matrix&accountName=perfect_pipeline&type=cf-1)]( https://g.codefresh.io/repositories/codefresh-io/example-voting-app/builds?filter=trigger:build;branch:master;service:5a84d1002b8eaa0001568329~example-voting-app-matrix)
 
+PART 1 Configuring Codefresh Repository, Deploying to Kubernetes using Helm Chart
+=========
+
 What are we doing?
 
 We are deploying the Docker example voting app as a Helm Release using Codefresh.
@@ -157,7 +160,76 @@ We'll be adding a Blog Post and additional followups to this example. Ex. Unit T
 
 If you'd like to schedule a demo of Codefresh to get help adding your own CI/CD steps to your Codefresh Pipelines [Click Here](https://codefresh.io/request-a-demo/)
 
-ORIGINAL CONTENT BELOW, PLEASE NOTE DOCKER SWARM DOES NOT WORK AT THIS TIME.
+PART 2 Add Selenium Deployment Verification Testing of Deployment
+=========
+
+What are we doing?
+
+We're iterating on PART 1
+
+* Getting the Endpoint IPs for vote and result services
+* Creating a Testing image with Python, Pytest and Selenium
+* Adding a composition build step using Selenium public images and Testing Docker image
+* Uploading HTML PyTest Reports to S3
+* Annotating Test Docker image with Selenium Report URLs
+
+One thing we need to make sure of when using Continuous Delivery is ensuring the application is accessible and usable.
+
+In `tests/selenium/test_app.py` I've created a few simple tests.
+
+We check the `vote` service's webpage for page title `Cats vs Dogs!`, the two expected buttons `Cats`/`Dogs` and finally generate a `click()` to `Cats` button.
+
+Next we check the `result` service's webpage for title `Cats vs Dogs -- Result`, `result` element and that elements text value to confirm it is not equal to `no votes` which indicates either our `click()` was never registered or the `result` ser vice cannot connect to the `postgres` database.
+
+Using these simple tests we can confirm the deployment was successful.
+
+I've made some updates to support multiple simultaneous releases.
+
+1. `HELM_RELEASE_NAME` was added to create a reusable variable to get service's IPs. (string) prepended to services.  ie. `my-deployment` = `my-deployment-vote`
+
+I will use this in the future to create releases based on Pull Requests.
+
+I have updated/added the following files.
+
+1. `./codefresh-matrix-pipeline.yml` updated with steps to support Selenium DVTs.
+1. `./Dockerfile` added for Docker image for Testing (Python, PyTest, Selenium)
+1. `./tests` added with python selenium tests file
+
+New variables to add to Codefresh Pipeline's Environment Variables
+
+1. `BROWSERS` space delimited list of browsers to test on.  This setup supports Chrome and Firefoxe. ie. `chrome firefox`
+1. `SERVICES` space delimited list of services, used to return service's IP. ie. `vote result`
+
+This step is completely optional and I've used S3 just to demonstrate how you can archive the Deployment Verification Test (PyTest HTML) reports generated and link them to your Testing image.
+
+Required Variables:
+
+New variables to add to Codefresh Respository's (General) Environment Variables
+
+1. `S3_BUCKETNAME` the AWS S3 Bucket Name to store the reports in.  For my example I chose to use the Codefresh Repository name `example-voting-app`.
+
+New Shared Configuration to add to Codefresh's Account Settings -> Shared Configurations
+
+Why did I choose to store the variables in a `Shared Secret` Shared Configuration Context?
+
+Normally, the AWS CLI credentials are required by more than one Codefresh Pipeline and can be shared across the account when you've generated them from a Service Account for usage in Codefresh.
+
+I called my `Shared Secret` `AWS_CLI`
+
+1. `AWS_DEFAULT_REGION` - AWS Region of S3 Bucket
+1. `AWS_ACCESS_KEY_ID` - AWS Access Key with write permissions to S3 bucket
+1. `AWS_SECRET_ACCESS_KEY` - AWS Secret Access Key for Access Key
+
+Now back in your Codefresh Matrix Pipeline `IMPORT FROM SHARED CONFIGURATION` and select your `Shared Secret`
+
+When you add the YAML for the build step `ArchiveSeleniumDVTs` a new folder based on the Codefresh Build ID `CF_BUILD_ID` will be created and the reports for `firefox` and `chrome` will be uploaded and finally your Docker Testing image will be annotated with the HTTP URLs to the reports.  By default the command is allowing public access using `--acl public-read`.  If you want to convert these to be only accessible by authorized users please remove.
+
+Additional Resources:
+http://pytest-selenium.readthedocs.io/en/latest/index.html
+https://github.com/SeleniumHQ/selenium/tree/master/py/test/selenium/webdriver/common
+https://github.com/SeleniumHQ/docker-selenium
+
+DOCKER'S ORIGINAL CONTENT BELOW, PLEASE NOTE DOCKER SWARM DOES NOT WORK AT THIS TIME.
 
 Example Voting App
 =========
