@@ -225,6 +225,7 @@ Now back in your Codefresh Matrix Pipeline `IMPORT FROM SHARED CONFIGURATION` an
 When you add the YAML for the build step `ArchiveSeleniumDVTs` a new folder based on the Codefresh Build ID `CF_BUILD_ID` will be created and the reports for `firefox` and `chrome` will be uploaded and finally your Docker Testing image will be annotated with the HTTP URLs to the reports.  By default the command is allowing public access using `--acl public-read`.  If you want to convert these to be only accessible by authorized users please remove.
 
 Additional Resources:
+
 http://pytest-selenium.readthedocs.io/en/latest/index.html
 https://github.com/SeleniumHQ/selenium/tree/master/py/test/selenium/webdriver/common
 https://github.com/SeleniumHQ/docker-selenium
