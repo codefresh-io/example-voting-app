@@ -73,4 +73,4 @@ def test_confirm_result(browser):
 def test_confirm_result_vote_tally(browser):
     browser.get("http://{}:80".format(result_endpoint_ip))
     element = browser.find_element(By.ID, 'result')
-    assert 'no votes' not in element.text
+    assert 'No votes yet' not in element.text
