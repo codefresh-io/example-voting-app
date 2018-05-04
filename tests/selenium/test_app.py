@@ -24,7 +24,7 @@ def browser():
     browser_name = ip = os.getenv('BROWSER')
     browser = webdriver.Remote(
         command_executor='http://selenium_hub:4444/wd/hub',
-        desired_capabilities={'browserName': 'chrome'},
+        desired_capabilities={'browserName': browser_name},
     )
     yield browser
     browser.quit()
