@@ -93,7 +93,7 @@ steps:
             - NODE_MAX_INSTANCES=5
     composition_candidates:
       test:
-        image: 'r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-tests:${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+        image: ${{BuildingTestDockerImage}}
         working_dir: ${{CF_VOLUME_PATH}}/${{CF_REPO_NAME}}
         environment:
           VOTE_ENDPOINT_IP: ${{VOTE_ENDPOINT_IP}}
