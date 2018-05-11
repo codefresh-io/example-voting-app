@@ -128,7 +128,6 @@ steps:
           - ${{BuildingTestDockerImage.imageId}}:
               - CHROME_SELENIUM_DVTS: "https://s3.${{AWS_DEFAULT_REGION}}.amazonaws.com/${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}/selenium-report-chrome.html"
               - FIREFOX_SELENIUM_DVTS: "https://s3.${{AWS_DEFAULT_REGION}}.amazonaws.com/${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}/selenium-report-firefox.html"
-  version: '1.0'
   PushChartToHelmRepository:
     title: Pushing Chart to Codefresh Chart Museum
     image: codefresh/cfstep-helm:2.9.0
