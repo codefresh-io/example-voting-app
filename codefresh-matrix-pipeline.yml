@@ -26,7 +26,7 @@ steps:
     image: codefresh/cfstep-helm:2.8.0 # You need to make sure you've set this to the correct version of Tiller installed on your helm init
     working_directory: ./
     environment:
-      - CHART_NAME=./helm/
+      - CHART_NAME=${{HELM_CHART_NAME}}
       - RELEASE_NAME=${{HELM_RELEASE_NAME}} # Updated for Seleniun
       - KUBE_CONTEXT=${{KUBE_CONTEXT}}
       - NAMESPACE=${{KUBE_NAMESPACE}}
@@ -128,3 +128,9 @@ steps:
           - ${{BuildingTestDockerImage.imageId}}:
               - CHROME_SELENIUM_DVTS: "https://s3.${{AWS_DEFAULT_REGION}}.amazonaws.com/${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}/selenium-report-chrome.html"
               - FIREFOX_SELENIUM_DVTS: "https://s3.${{AWS_DEFAULT_REGION}}.amazonaws.com/${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}/selenium-report-firefox.html"
+  PushChartToHelmRepository:
+    title: Pushing Chart to Codefresh Chart Museum
+    image: codefresh/cfstep-helm:2.9.0
+    environment:
+      - ACTION=push
+      - CHART_REF=${{HELM_CHART_NAME}}
