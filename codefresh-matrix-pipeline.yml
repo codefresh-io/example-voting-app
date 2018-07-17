@@ -19,7 +19,7 @@ steps:
     image: 'codefresh/cli:latest'
     commands: 
       - apk add bash
-      - bash -c 'IFS=" " read -a pipelineidsarray <<< "${{PARALLEL_PIPELINES_IDS}}" && for id in "${pipelineidsarray[@]}"; do buildids="$buildids $(codefresh run $id -b=${{CF_BRANCH}} -d)"; done && codefresh wait $buildids'
+      - bash -c 'IFS=" " read -a pipelineidsarray <<< "${{PARALLEL_PIPELINES_IDS}}" && for id in "${pipelineidsarray[@]}"; do buildids="$buildids $(codefresh run $id -b=${{CF_BRANCH}} --enable-reporting -d)"; done && codefresh wait $buildids'
   HelmUpgrade:
     title: Running Helm Upgrade
     image: codefresh/cfstep-helm:2.8.0 # You need to make sure you've set this to the correct version of Tiller installed on your helm init
