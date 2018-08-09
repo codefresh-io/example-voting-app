@@ -5,7 +5,7 @@ Setting up Example Voting App in Codefresh
 PART 1 Configuring Codefresh Repository, Deploying to Kubernetes using Helm Chart
 =========
 
-What are we doing?
+What are we doing? 
 
 We are deploying the Docker example voting app as a Helm Release using Codefresh.
 
