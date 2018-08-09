@@ -3,7 +3,7 @@ Setting up Example Voting App in Codefresh
 [![Codefresh build status]( https://g.codefresh.io/api/badges/build?repoOwner=codefresh-io&repoName=example-voting-app&branch=master&pipelineName=example-voting-app-matrix&accountName=perfect_pipeline&type=cf-1)]( https://g.codefresh.io/repositories/codefresh-io/example-voting-app/builds?filter=trigger:build;branch:master;service:5a84d1002b8eaa0001568329~example-voting-app-matrix)
 
 PART 1 Configuring Codefresh Repository, Deploying to Kubernetes using Helm Chart
-=========
+========= 
 
 What are we doing?
 
