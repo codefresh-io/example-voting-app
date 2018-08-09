@@ -1,3 +1,5 @@
+version: '1.0'
+steps:
   GetKubernetesServicesEndpoints:
     title: Getting Kubernetes Services Endpoints
     image: codefresh/cfstep-helm

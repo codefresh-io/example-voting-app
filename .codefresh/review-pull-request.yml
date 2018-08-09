@@ -24,26 +24,12 @@ steps:
     title: Create short-lived environment AKA staging server
     image: 'codefresh/cli:latest'
     commands:
-      -< 
-        codefresh run todaywasawesome/example-voting-app/deploy-staging 
-        -b=${{CF_BRANCH}} 
-        -s=${{CF_REVISION}} 
-        --enable-notifications 
-        -v HELM_CHART_NAME=${{HELM_CHART_NAME}} 
-        -v HELM_RELEASE_NAME=${{HELM_RELEASE_NAME}} 
-        -v KUBE_CONTEXT=${{KUBE_CONTEXT}} 
-        -v KUBE_NAMESPACE=${{KUBE_NAMESPACE}} 
-        -d
+      - codefresh run codefresh-io/example-voting-app/deploy-staging -b='${{CF_BRANCH}}' -s='${{CF_REVISION}}' --enable-notifications -v HELM_CHART_NAME='${{HELM_CHART_NAME}}' -v HELM_RELEASE_NAME='${{HELM_RELEASE_NAME}}' -v KUBE_CONTEXT='${{KUBE_CONTEXT}}' -v KUBE_NAMESPACE=${{KUBE_NAMESPACE}} -d
   SeleniumTests:
     title: Selenium Tests
     image: 'codefresh/cli:latest'
-    command:
-      -< 
-        codefresh run todaywasawesome/example-voting-app/selnium-tests 
-        -b=${{CF_BRANCH}} 
-        -s=${{CF_REVISION}} 
-        --enable-notifications 
-        -v SERVICES='${{SERVICES}}'
+    commands:
+      - codefresh run codefresh-io/example-voting-app/selnium-tests -b='${{CF_BRANCH}}' -s='${{CF_REVISION}}' --enable-notifications -v SERVICES='${{SERVICES}}'
   PushChartToHelmRepository:
     title: Pushing Chart to Codefresh Chart Museum
     image: codefresh/cfstep-helm
