@@ -1,0 +1,19 @@
+  HelmUpgrade:
+    title: Running Helm Upgrade
+    image: codefresh/cfstep-helm # You need to make sure you've set this to the correct version of Tiller installed on your helm init
+    working_directory: ./
+    environment:
+      - CHART_NAME=${{HELM_CHART_NAME}}
+      - RELEASE_NAME=${{HELM_RELEASE_NAME}} # Updated for Seleniun
+      - KUBE_CONTEXT=${{KUBE_CONTEXT}}
+      - NAMESPACE=${{KUBE_NAMESPACE}}
+      - DEBUG_CHART=true
+      - custom_result_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-result
+      - custom_result_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_result_image_pullSecret=${{KUBE_PULL_SECRET}}
+      - custom_vote_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-vote
+      - custom_vote_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_vote_image_pullSecret=${{KUBE_PULL_SECRET}}
+      - custom_worker_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-worker
+      - custom_worker_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_worker_image_pullSecret=${{KUBE_PULL_SECRET}}

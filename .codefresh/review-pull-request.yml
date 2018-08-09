@@ -1,0 +1,44 @@
+# NOTES
+# You will need 4 concurrent pipelines to allow this to run as fast as possible
+# Please generate an API Key Codefresh CLI https://g.codefresh.io/account/tokens and store in API_KEY variable
+# You need to configure Docker Registry access in Codefresh and set push build step for (3) micro-services to push to that registry by friendly name
+# You need to configure Kubernetes with a Pull Secret for the Registry and update variable KUBE_PULL_SECRET with the name you gave the secret
+# Pull Secrets explained: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+# You can use your integrated Codefresh Registry for above just follow steps documented here: https://codefresh.io/docs/docs/docker-registries/codefresh-registry/
+# Update the _repository values below with that value ex. r.cfcr.io/CF_ACCOUNT/CF_REPOSITORY/PIPELINE_NAME or r.cfcr.io/perfect_pipeline/codefresh/example-voting-app-worker
+# Please make sure to update each pipeline yaml file under result, vote and worker with your correct friendly Docker Registry name See comment inline on those files
+# Pipeline IDs for the pipelines for 3 microservices (Shown in curl webhook command on pipeline page in Configuration > General Settings)
+# Create KUBE_CONTEXT variables with Codefresh friendly name given to your Kubernetes Cluster
+# Create KUBE_NAMESPACE variable with Kubernetes namespace for Release
+# Create HELM_RELEASE_NAME variables with Helm Release Name
+# Create BROWSERS variable with space delimited supported browsers 'chrome firefox'
+version: '1.0'
+steps:
+  BuildingMicroServices:
+    title: Executing Parallel Docker Builds
+    image: 'codefresh/cli:latest'
+    commands: 
+      - apk add bash
+      - bash -c 'IFS=" " read -a pipelineidsarray <<< "${{PARALLEL_PIPELINES_IDS}}" && for id in "${pipelineidsarray[@]}"; do buildids="$buildids $(codefresh run $id -b=${{CF_BRANCH}} -s=${{CF_REVISION}} --enable-notifications -d)"; done && codefresh wait $buildids'
+  DeployStaging:
+    title: Create short-lived environment AKA staging server
+    image: 'codefresh/cli:latest'
+    commands:
+      - codefresh run todaywasawesome/example-voting-app/deploy-staging -b=${{CF_BRANCH}} -s=${{CF_REVISION}} --enable-notifications \
+      -v HELM_CHART_NAME=${{HELM_CHART_NAME}} \
+      -v HELM_RELEASE_NAME=${{HELM_RELEASE_NAME}} \
+      -v KUBE_CONTEXT=${{KUBE_CONTEXT}} \
+      -v KUBE_NAMESPACE=${{KUBE_NAMESPACE}} \
+      -d
+  SeleniumTests:
+    title: Selenium Tests
+    image: 'codefresh/cli:latest'
+    commands:
+      - codefresh run todaywasawesome/example-voting-app/selnium-tests -b=${{CF_BRANCH}} -s=${{CF_REVISION}} --enable-notifications \
+      -v SERVICES='${{SERVICES}}'
+  PushChartToHelmRepository:
+    title: Pushing Chart to Codefresh Chart Museum
+    image: codefresh/cfstep-helm
+    environment:
+      - ACTION=push
+      - CHART_REF=${{HELM_CHART_NAME}}

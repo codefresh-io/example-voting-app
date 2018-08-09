@@ -1,0 +1,88 @@
+  GetKubernetesServicesEndpoints:
+    title: Getting Kubernetes Services Endpoints
+    image: codefresh/cfstep-helm
+    commands:
+      - bash -c 'IFS=" " read -a services <<< "${{SERVICES}}" && for service in "${services[@]}"; do external_ip=""; while [ -z $external_ip ]; do echo "Waiting for end point..."; external_ip=$(kubectl get svc ${{HELM_RELEASE_NAME}}-${service} --namespace ${{KUBE_NAMESPACE}} --template="{{range .status.loadBalancer.ingress}}{{.ip}}{{end}}"); [ -z "$external_ip" ] && sleep 10; done; echo "End point ready-" && echo $external_ip; cf_export ${service^^}_ENDPOINT_IP=$external_ip; done'
+  BuildingTestDockerImage:
+    title: Building Test Docker Image
+    type: build
+    image_name: codefresh/example-voting-app-tests
+    working_directory: ./
+    dockerfile: Dockerfile
+    tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+  PostDeploymentVerificationTests:
+    title: Running Selenium DVTs
+    type: composition
+    composition:
+      version: '2'
+      services:
+        selenium_hub:
+          image: selenium/hub
+          ports:
+            - 4444
+          environment:
+            - SE_OPTS=-debug
+            - GRID_MAX_SESSION=5
+        chrome_node:
+          image: selenium/node-chrome
+          ports:
+            - 5900
+            - 5555
+          command: bash -c "sleep 5 && /opt/bin/entry_point.sh"
+          depends_on: 
+            - selenium_hub
+          environment:
+            - HUB_HOST=selenium_hub
+            - REMOTE_HOST=http://chrome_node:5555
+            - NODE_MAX_SESSION=5
+            - NODE_MAX_INSTANCES=5
+        firefox_node:
+          image: selenium/node-firefox
+          ports:
+            - 5900
+            - 5555
+          command: bash -c "sleep 5 && /opt/bin/entry_point.sh"
+          depends_on: 
+            - selenium_hub
+          environment:
+            - HUB_HOST=selenium_hub
+            - REMOTE_HOST=http://firefox_node:5555
+            - NODE_MAX_SESSION=5
+            - NODE_MAX_INSTANCES=5
+    composition_candidates:
+      test:
+        image: ${{BuildingTestDockerImage}}
+        working_dir: ${{CF_VOLUME_PATH}}/${{CF_REPO_NAME}}
+        environment:
+          VOTE_ENDPOINT_IP: ${{VOTE_ENDPOINT_IP}}
+          RESULT_ENDPOINT_IP: ${{RESULT_ENDPOINT_IP}}
+        command: bash -c 'IFS=" " read -a browserarray <<< "${{BROWSERS}}" && for browser in "$${browserarray[@]}"; do BROWSER=$$browser python -m pytest -vvv --html=./selenium-report-$${browser}.html --self-contained-html ./tests/selenium/test_app.py; done'
+        volumes:
+          - '${{CF_VOLUME_NAME}}:/codefresh/volume'
+    add_flow_volume_to_composition: true
+    on_success:
+      metadata:
+        set:
+          - '${{BuildingTestDockerImage.imageId}}':
+              - SELENIUM_DVTS: true
+    on_fail:
+      metadata:
+        set:
+          - '${{BuildingTestDockerImage.imageId}}':
+              - SELENIUM_DVTS: false
+  ArchiveSeleniumDVTReports:
+    title: Archiving Selenium DVT Reports
+    image: mesosphere/aws-cli
+    working_directory: ./
+    commands:
+      - apk update
+      - apk upgrade
+      - apk add bash
+      - bash -c 'IFS=" " read -a browserarray <<< "${{BROWSERS}}" && for browser in "${browserarray[@]}"; do BROWSER=$browser aws s3 cp ./selenium-report-${browser}.html s3://${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}/selenium-report-${browser}.html --acl public-read; done'
+    on_success:
+     metadata:
+        set:
+          # I manually setup metadata for each browser
+          - ${{BuildingTestDockerImage.imageId}}:
+              - CHROME_SELENIUM_DVTS: "https://s3.${{AWS_DEFAULT_REGION}}.amazonaws.com/${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}/selenium-report-chrome.html"
+              - FIREFOX_SELENIUM_DVTS: "https://s3.${{AWS_DEFAULT_REGION}}.amazonaws.com/${{S3_BUCKETNAME}}/${{CF_BUILD_ID}}/selenium-report-firefox.html"

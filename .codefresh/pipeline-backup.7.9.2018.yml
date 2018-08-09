@@ -1,0 +1,166 @@
+# NOTES
+# You will need 4 concurrent pipelines to allow this to run as fast as possible
+# Please generate an API Key Codefresh CLI https://g.codefresh.io/account/tokens and store in API_KEY variable
+# You need to configure Docker Registry access in Codefresh and set push build step for (3) micro-services to push to that registry by friendly name
+# You need to configure Kubernetes with a Pull Secret for the Registry and update variable KUBE_PULL_SECRET with the name you gave the secret
+# Pull Secrets explained: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+# You can use your integrated Codefresh Registry for above just follow steps documented here: https://codefresh.io/docs/docs/docker-registries/codefresh-registry/
+# Update the _repository values below with that value ex. r.cfcr.io/CF_ACCOUNT/CF_REPOSITORY/PIPELINE_NAME or r.cfcr.io/perfect_pipeline/codefresh/example-voting-app-worker
+# Please make sure to update each pipeline yaml file under result, vote and worker with your correct friendly Docker Registry name See comment inline on those files
+# Pipeline IDs for the pipelines for 3 microservices (Shown in curl webhook command on pipeline page in Configuration > General Settings)
+# Create KUBE_CONTEXT variables with Codefresh friendly name given to your Kubernetes Cluster
+# Create KUBE_NAMESPACE variable with Kubernetes namespace for Release
+# TODO Turn into README
+version: '1.0'
+steps:
+  BuildMicroServices:
+    title: Build Docker Images
+    image: 'codefresh/cli:latest'
+    commands: 
+      - apk add bash
+      - codefresh auth create-context --api-key ${{CODEFRESH_CLI_KEY}}
+      - echo "Checking if images exist..."
+      - codefresh get image --image-name example-voting-app-worker --tag ${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}} | grep "no available resources" && echo "rebuild" || { echo "Skipping builds"; exit 0; }
+      - bash -c 'IFS=" " read -a pipelineidsarray <<< "${{PARALLEL_PIPELINES_IDS}}" && for id in "${pipelineidsarray[@]}"; do buildids="$buildids $(codefresh run $id -b=${{CF_BRANCH}} -d)"; done && codefresh wait $buildids'
+    when:
+      condition:
+        all:
+          debug: '"${{DEBUG}}" ==  "false"'
+  HelmUpgrade:
+    title: Create and Deploy Staging Instance
+    image: codefresh/plugin-helm:2.8.0 # You need to make sure you've set this to the correct version of Tiller installed on your helm init
+    working_directory: ./
+    environment:
+      - CHART_NAME=./helm/
+      - RELEASE_NAME=staging-voting-app
+      - KUBE_CONTEXT=${{KUBE_CONTEXT}}
+      - NAMESPACE=${{KUBE_NAMESPACE}}
+      - DEBUG_CHART=true
+      - WAIT=YES
+      - custom_postgresql_persistence_enabled=false
+      - custom_redis_persistence_enabled=false
+      - custom_postgresql_persistence_existingClaim=staging-voting-app-postgresql
+      - custom_postgresql_persistence_storageClass=px-ha-sc
+      - custom_redis_persistence_existingClaim=staging-voting-app-redis
+      - custom_redis_persistence_storageClass=px-ha-sc
+      - custom_result_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-result
+      - custom_result_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_result_image_pullSecret=${{KUBE_PULL_SECRET}}
+      - custom_vote_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-vote
+      - custom_vote_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_vote_image_pullSecret=${{KUBE_PULL_SECRET}}
+      - custom_worker_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-worker
+      - custom_worker_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_worker_image_pullSecret=${{KUBE_PULL_SECRET}}
+    when:
+      condition:
+        all:
+          debug: '"${{DEBUG}}" ==  "false"'
+  GrabEndPoint:
+    title: Waiting for Endpoint
+    image: codefresh/plugin-helm:2.8.0
+    commands:
+      - bash -c 'external_ip=""; while [ -z $external_ip ]; do echo "Waiting for end point..."; external_ip=$(kubectl get svc staging-voting-app-vote --template="{{range .status.loadBalancer.ingress}}{{.ip}}{{end}}"); [ -z "$external_ip" ] && sleep 10; done; echo "End point ready-" && echo $external_ip; cf_export IP=$external_ip'
+    when:
+      condition:
+        all:
+          debug: '"${{DEBUG}}" ==  "false"'
+  BuildingTestDockerImage:
+    title: Building Testing Images
+    type: build
+    image_name: codefresh/example-voting-app-tests
+    working_directory: ./
+    dockerfile: Dockerfile
+    tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+  RunTestim:
+    title: Functional Tests (UI, Security, Performance)
+    image: testim/docker-cli
+    environment:
+      - token=${{TESTIM_TOKEN}}
+      - project=${{TESTIM_PROJECT}}
+      - label=sanity
+      - host=ondemand.testim.io
+      - port=4444
+    commands: 
+      - testim --token "${token}" --project "${project}" --host "${host}" --port "${port}" --label "${label}" --report-file ${{CF_VOLUME_PATH}}/testim-results.xml | tee ${{CF_VOLUME_PATH}}/testims
+    on_success: # Execute only once the step succeeded
+      metadata: # Declare the metadata attribute
+        set: # Specify the set operation
+          - ${{BuildingTestDockerImage.imageId}}: # Select any number of target images
+            - UnitCoverage: 83%
+            - JIRA: https://codefresh-io.atlassian.net/browse/CF-5100
+            - PerformanceLatency: 0.077
+            - PerformanceReport: https://a.blazemeter.com/app/#/masters/17062708
+            - Security: moderate
+            - SecurityReport: http://35.203.149.15:8081/api/v1/scan/scan-2018-04-03T13:57:29.324.tar.gz
+    on_fail:
+      metadata: # Declare the metadata attribute
+        set: # Specify the set operation
+          - ${{BuildingTestDockerImage.imageId}}: # Select any number of target images
+            - UI: false
+            - CF_QUALITY: false
+  CalulcateTests:
+    title: Caculate Test Passed
+    image: frolvlad/alpine-bash
+    commands:
+      - cat ${{CF_VOLUME_PATH}}/testims | grep "Batch execution" | grep -Eo '[a-zA-Z0-9]{10,}'
+      - echo "1"
+      - cat ${{CF_VOLUME_PATH}}/testims | grep "Batch execution" | grep -Eo '[a-zA-Z0-9]{10,}' > ${{CF_VOLUME_PATH}}/batchid
+      - echo "2"
+      - url=`cat ${{CF_VOLUME_PATH}}/batchid`
+      - echo "3"
+      - echo "https://app.testim.io/#/project/${{TESTIM_PROJECT}}/runs/suites/$url"
+      - echo "4"
+      - tests=`cat ${{CF_VOLUME_PATH}}/testim-results.xml | grep -Eo 'tests\=\"[0-9]{1,}' | grep -Eo '[0-9]{1,}'`
+      - echo "5"
+      - testsfailed=`cat ${{CF_VOLUME_PATH}}/testim-results.xml | grep -Eo 'failure\=\"[0-9]{1,}' | grep -Eo '[0-9]{1,}'`
+      - echo "6"
+      - cf_export URL=$url 
+      - cf_export TESTS=$tests 
+      - cf_export TESTSFAILED=$testsfailed
+      - echo "Run calculations"
+      - SUCCESSRATE=`echo "scale=2; (${TESTS} / (${TESTS}-${TESTSFAILED}))*100" | bc`
+      - echo $SUCCESSRATE
+      - cf_export SUCCESSRATE=$SUCCESSRATE
+  CollectTestResults:
+    title: Capture Results
+    image: codefresh/cli
+    commands:
+      - codefresh --help
+      - echo ${SUCCESSRATE}
+    on_finish:
+      metadata:
+        set:
+          - ${{BuildingTestDockerImage.imageId}}: # Select any number of target images
+            - UI: true 
+            - Testim_UI: "https://app.testim.io/#/project/${{TESTIM_PROJECT}}/runs/suites/${{URL}}"
+            - UI_Success: "${{SUCCESSRATE}}%"
+  DeployProd:
+    title: Deploy Chart to Production
+    image: codefresh/plugin-helm:2.8.0 # You need to make sure you've set this to the correct version of Tiller installed on your helm init
+    working_directory: ./
+    environment:
+      - CHART_NAME=./helm/
+      - RELEASE_NAME=prod-voting-app
+      - KUBE_CONTEXT=${{KUBE_CONTEXT}}
+      - NAMESPACE=${{KUBE_NAMESPACE}}
+      - DEBUG_CHART=true
+      - custom_result_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-result
+      - custom_result_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_result_image_pullSecret=${{KUBE_PULL_SECRET}}
+      - custom_vote_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-vote
+      - custom_vote_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_vote_image_pullSecret=${{KUBE_PULL_SECRET}}
+      - custom_worker_image_repository=r.cfcr.io/${{CODEFRESH_ACCOUNT}}/codefresh/example-voting-app-worker
+      - custom_worker_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_worker_image_pullSecret=${{KUBE_PULL_SECRET}}
+    when:
+      condition:
+        all:
+          debug: '"${{DEBUG}}" ==  "false"'
+    on_success:
+      metadata:
+        set:
+          - ${{BuildingTestDockerImage.imageId}}: # Select any number of target images
+            - CF_QUALITY: true
+            - Deployed_to_Prod: true
