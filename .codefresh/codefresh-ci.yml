@@ -102,9 +102,9 @@ steps:
       - GITHUB_DESCRIPTION=Created Pull Request Environment
       - GITHUB_TARGET_URL=https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}/services
     when:
-    condition:
-      any:
-        isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
+      condition:
+        any:
+          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
   NotifySlackChannel:
     title: Sending Slack Notification for Pull Request Environment
     image: cloudposse/slack-notifier
@@ -114,6 +114,10 @@ steps:
       - SLACK_ICON_EMOJI=":codefresh:"
       - SLACK_TITLE="Pull Request Environment Deployed for ${{CF_BRANCH_TAG_NORMALIZED}}"
       - SLACK_TITLE_LINK="https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}/services"
+    when:
+      condition:
+        any:
+          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
   PushChartToHelmRepository:
     stage: staging
     title: Push Helm Chart to Repository
