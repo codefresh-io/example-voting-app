@@ -70,7 +70,7 @@ steps:
     when:
       condition:
         any:
-          isPR: "Boolean('${{CF_PULL_REQUEST_NUMBER}}') == true"
+          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
   PushChartToHelmRepository:
     stage: staging
     title: Push Helm Chart to Repository
