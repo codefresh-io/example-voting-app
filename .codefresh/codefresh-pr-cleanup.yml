@@ -1,0 +1,8 @@
+version: '1.0'
+steps:
+  DeletePullRequestEnvironment:
+    title: Deleting Pull Request Environment
+    image: codefresh/cfstep-helm
+    commands:
+      - kubectl config use-context sales-demo
+      - helm delete ${{PULL_REQUEST_NUMBER}}-${{CFBRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}} --purge
