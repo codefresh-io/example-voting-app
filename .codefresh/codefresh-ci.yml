@@ -38,6 +38,23 @@ steps:
         dockerfile: Dockerfile
         tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
     fail_fast: true
+  NotifyGitHubPREnv:
+    title: Set Pull Request Environment pending
+    image: cloudposse/github-status-updater
+    environment:
+      - GITHUB_ACTION=update_state
+      - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+      - GITHUB_OWNER=${{CF_REPO_OWNER}}
+      - GITHUB_REPO=${{CF_REPO_NAME}}
+      - GITHUB_REF=${{CF_REVISION}}
+      - GITHUB_CONTEXT=Pull Request Environment
+      - GITHUB_STATE=pending
+      - GITHUB_DESCRIPTION=Created Pull Request Environment
+      - GITHUB_TARGET_URL=https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}/services
+    when:
+      condition:
+        any:
+          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
   DeployPRRelease:
     stage: pullrequest
     title: Create Ephemeral Helm Release for Pull Request
@@ -71,6 +88,32 @@ steps:
       condition:
         any:
           isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
+  NotifyGitHubPREnv:
+    title: Set Pull Request Environment URL
+    image: cloudposse/github-status-updater
+    environment:
+      - GITHUB_ACTION=update_state
+      - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+      - GITHUB_OWNER=${{CF_REPO_OWNER}}
+      - GITHUB_REPO=${{CF_REPO_NAME}}
+      - GITHUB_REF=${{CF_REVISION}}
+      - GITHUB_CONTEXT=Pull Request Environment
+      - GITHUB_STATE=success
+      - GITHUB_DESCRIPTION=Created Pull Request Environment
+      - GITHUB_TARGET_URL=https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}/services
+    when:
+    condition:
+      any:
+        isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
+  NotifySlackChannel:
+    title: Sending Slack Notification for Pull Request Environment
+    image: cloudposse/slack-notifier
+    environment:
+      - SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+      - SLACK_USER_NAME=codefresh
+      - SLACK_ICON_EMOJI=":codefresh:"
+      - SLACK_TITLE="Pull Request Environment Deployed for ${{CF_BRANCH_TAG_NORMALIZED}}"
+      - SLACK_TITLE_LINK="https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}/services"
   PushChartToHelmRepository:
     stage: staging
     title: Push Helm Chart to Repository
@@ -116,6 +159,15 @@ steps:
       branch:
         only:
           - master
+  NotifySlackChannel:
+    title: Sending Slack Notification for Staging Upgrade
+    image: cloudposse/slack-notifier
+    environment:
+      - SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+      - SLACK_USER_NAME=codefresh
+      - SLACK_ICON_EMOJI=":codefresh:"
+      - SLACK_TITLE="Staging Upgraded to ${{CF_BRANCH_TAG_NORMALIZED}}"
+      - SLACK_TITLE_LINK="https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/example-voting-app/services" 
   UpgradeProductionRelease:
     stage: production
     title: Upgrading Production Release
@@ -152,3 +204,17 @@ steps:
         all:
           semverTag: 'match("${{CF_BRANCH}}", "^v([0-9]+)([.][0-9]+){1,2}$", true) == true'
           masterBranch: '"${{CF_BASE_BRANCH}}" == "master"'
+  NotifySlackChannel:
+    title: Sending Slack Notification for Production Upgrade
+    image: cloudposse/slack-notifier
+    environment:
+      - SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+      - SLACK_USER_NAME=codefresh
+      - SLACK_ICON_EMOJI=":codefresh:"
+      - SLACK_TITLE="Production Upgraded to ${{CF_BRANCH_TAG_NORMALIZED}}"
+      - SLACK_TITLE_LINK="https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/example-voting-app/services"
+    when:
+      condition:
+        all:
+          semverTag: 'match("${{CF_BRANCH}}", "^v([0-9]+)([.][0-9]+){1,2}$", true) == true'
+          masterBranch: '"${{CF_BASE_BRANCH}}" == "master"' 
