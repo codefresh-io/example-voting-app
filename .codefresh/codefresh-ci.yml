@@ -1,10 +1,9 @@
 version: '1.0'
 stages:
   - build
-  - test
+  - pullrequest
   - staging
   - production
-  - dvts
 steps:
   BuildingMicroServices:
     type: parallel
@@ -40,7 +39,7 @@ steps:
         tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
     fail_fast: true
   DeployPRRelease:
-    stage: integration
+    stage: pullrequest
     title: Create Ephemeral Helm Release for Pull Request
     image: codefresh/cfstep-helm
     working_directory: ./
@@ -64,7 +63,7 @@ steps:
         any:
           isPR: "Boolean('${{CF_PULL_REQUEST_NUMBER}}') == true"
   RunPRDVTs:
-    stage: integration
+    stage: pullrequest
     image: 'codefresh/cli:latest'
     commands:
       - codefresh run dustinvanbuskirk/example-voting-app/dvts -b='${{CF_BRANCH}}' -s='${{CF_REVISION}}' -v KUBE_CONTEXT=sales-demo -v NAMESPACE=dustinvb-pull-requests -v SERVICES='vote result' -v RELEASE_NAME='${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}' -v TEST_IMAGE='example-voting-app/tests:${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
