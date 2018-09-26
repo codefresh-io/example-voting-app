@@ -45,7 +45,7 @@ steps:
     working_directory: ./
     environment:
       - CHART_NAME=example-voting-app
-      - RELEASE_NAME=${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}
+      - RELEASE_NAME='${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}'
       - KUBE_CONTEXT=sales-demo@FirstKubernetes
       - NAMESPACE=dustinvb-pull-requests
       - DEBUG_CHART=true
@@ -61,7 +61,7 @@ steps:
     when:
       condition:
         any:
-          isPR: "Boolean('${{CF_PULL_REQUEST_NUMBER}}') == true"
+          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
   RunPRDVTs:
     stage: pullrequest
     image: 'codefresh/cli:latest'
