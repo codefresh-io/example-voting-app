@@ -54,7 +54,7 @@ steps:
     when:
       condition:
         any:
-          isPR: "'${{CF_PULL_REQUEST_ACTION}}' != 'CF_PULL_REQUEST_ACTION'"
+          isPR: "	String('${{CF_PULL_REQUEST_ACTION}}') != 'CF_PULL_REQUEST_ACTION'"
   DeployPRRelease:
     stage: pullrequest
     title: Create Ephemeral Helm Release for Pull Request
