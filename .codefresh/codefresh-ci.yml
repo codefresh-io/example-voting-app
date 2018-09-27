@@ -38,11 +38,6 @@ steps:
         dockerfile: Dockerfile
         tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
     fail_fast: true
-  Test:
-    title: Test
-    image: alpine
-    commands:
-      - echo ${{CF_PULL_REQUEST_ACTION}}
   NotifyGitHubPREnvCreating:
     title: Set Pull Request Environment pending
     image: cloudposse/github-status-updater
