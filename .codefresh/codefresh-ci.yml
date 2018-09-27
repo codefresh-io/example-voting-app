@@ -54,7 +54,8 @@ steps:
     when:
       condition:
         any:
-          isPR: "	String('${{CF_PULL_REQUEST_ACTION}}') != 'CF_PULL_REQUEST_ACTION'"
+          isPRopen: "'${{CF_PULL_REQUEST_ACTION}}' == 'opened'"
+          isPRreopen: "'${{CF_PULL_REQUEST_ACTION}}' == 'reopened'"
   DeployPRRelease:
     stage: pullrequest
     title: Create Ephemeral Helm Release for Pull Request
