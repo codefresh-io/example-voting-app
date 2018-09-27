@@ -54,7 +54,7 @@ steps:
     when:
       condition:
         any:
-          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
+          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}')"
   DeployPRRelease:
     stage: pullrequest
     title: Create Ephemeral Helm Release for Pull Request
@@ -78,7 +78,7 @@ steps:
     when:
       condition:
         any:
-          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
+          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}')"
   RunPRDVTs:
     stage: pullrequest
     image: 'codefresh/cli:latest'
@@ -104,7 +104,7 @@ steps:
     when:
       condition:
         any:
-          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
+          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}')"
   NotifySlackChannelPR:
     title: Sending Slack Notification for Pull Request Environment
     image: cloudposse/slack-notifier
@@ -117,7 +117,7 @@ steps:
     when:
       condition:
         any:
-          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}') == true"
+          isPR: "String('${{CF_PULL_REQUEST_NUMBER}}')"
   PushChartToHelmRepository:
     stage: staging
     title: Push Helm Chart to Repository
