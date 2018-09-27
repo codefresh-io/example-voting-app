@@ -1,0 +1,229 @@
+version: '1.0'
+stages:
+  - build
+  - pullrequest
+  - staging
+  - production
+steps:
+  BuildingMicroServices:
+    type: parallel
+    stage: build
+    steps:
+      BuildResultsImage:
+        title: Building Results Image
+        type: build
+        image_name: example-voting-app/result
+        working_directory: ./result/
+        dockerfile: Dockerfile
+        tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+      BuildVoteImage:
+        title: Building Vote Image
+        type: build
+        image_name: example-voting-app/vote
+        working_directory: ./vote/
+        dockerfile: Dockerfile
+        tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+      BuildWorkerImage:
+        title: Building Worker Image
+        type: build
+        image_name: example-voting-app/worker
+        working_directory: ./worker/
+        dockerfile: Dockerfile
+        tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+      BuildTestImage:
+        title: Building Test Image
+        type: build
+        image_name: example-voting-app/tests
+        working_directory: ./
+        dockerfile: Dockerfile
+        tag: '${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+    fail_fast: true
+  NotifyGitHubPREnvCreating:
+    title: Set Pull Request Environment pending
+    image: cloudposse/github-status-updater
+    environment:
+      - GITHUB_ACTION=update_state
+      - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+      - GITHUB_OWNER=${{CF_REPO_OWNER}}
+      - GITHUB_REPO=${{CF_REPO_NAME}}
+      - GITHUB_REF=${{CF_REVISION}}
+      - GITHUB_CONTEXT=Pull Request Environment
+      - GITHUB_STATE=pending
+      - GITHUB_DESCRIPTION=Creating Pull Request Environment
+      - GITHUB_TARGET_URL=https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}/services
+    when:
+      condition:
+        any:
+          isPRopen: "'${{CF_PULL_REQUEST_ACTION}}' == 'opened'"
+          isPRreopen: "'${{CF_PULL_REQUEST_ACTION}}' == 'reopened'"
+  DeployPRRelease:
+    stage: pullrequest
+    title: Create Ephemeral Helm Release for Pull Request
+    image: codefresh/cfstep-helm:2.10.0
+    working_directory: ./
+    environment:
+      - CHART_NAME=example-voting-app
+      - RELEASE_NAME='${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}'
+      - KUBE_CONTEXT=sales-demo@FirstKubernetes
+      - NAMESPACE=dustinvb-pull-requests
+      - DEBUG_CHART=true
+      - custom_result_image_repository=r.cfcr.io/dustinvanbuskirk/example-voting-app/result
+      - custom_result_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_result_image_pullSecret=codefresh-generated-r.cfcr.io-cfcr-dustinvb-pull-requests
+      - custom_vote_image_repository=r.cfcr.io/dustinvanbuskirk/example-voting-app/vote
+      - custom_vote_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_vote_image_pullSecret=codefresh-generated-r.cfcr.io-cfcr-dustinvb-pull-requests
+      - custom_worker_image_repository=r.cfcr.io/dustinvanbuskirk/example-voting-app/worker
+      - custom_worker_image_tag=${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+      - custom_worker_image_pullSecret=codefresh-generated-r.cfcr.io-cfcr-dustinvb-pull-requests  
+    when:
+      condition:
+        any:
+          isPR: "Number(${{CF_PULL_REQUEST_NUMBER}})"
+  RunPRDVTs:
+    stage: pullrequest
+    image: 'codefresh/cli:latest'
+    commands:
+      - codefresh run dustinvanbuskirk/example-voting-app/dvts -b='${{CF_BRANCH}}' -s='${{CF_REVISION}}' -v KUBE_CONTEXT=sales-demo -v NAMESPACE=dustinvb-pull-requests -v SERVICES='vote result' -v RELEASE_NAME='${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}' -v TEST_IMAGE='example-voting-app/tests:${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}'
+    when:
+      condition:
+        any:
+          isPR: "Number(${{CF_PULL_REQUEST_NUMBER}})"
+  NotifyGitHubPREnvCreated:
+    title: Set Pull Request Environment URL
+    image: cloudposse/github-status-updater
+    environment:
+      - GITHUB_ACTION=update_state
+      - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+      - GITHUB_OWNER=${{CF_REPO_OWNER}}
+      - GITHUB_REPO=${{CF_REPO_NAME}}
+      - GITHUB_REF=${{CF_REVISION}}
+      - GITHUB_CONTEXT=Pull Request Environment
+      - GITHUB_STATE=success
+      - GITHUB_DESCRIPTION=Created Pull Request Environment
+      - GITHUB_TARGET_URL=https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}/services
+    when:
+      condition:
+        any:
+          isPR: "Number(${{CF_PULL_REQUEST_NUMBER}})"
+  NotifySlackChannelPR:
+    title: Sending Slack Notification for Pull Request Environment
+    image: cloudposse/slack-notifier
+    environment:
+      - SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+      - SLACK_USER_NAME=codefresh
+      - SLACK_ICON_EMOJI=":codefresh:"
+      - SLACK_TITLE="Pull Request Environment Deployed for ${{CF_BRANCH_TAG_NORMALIZED}}"
+      - SLACK_TITLE_LINK="https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/${{CF_PULL_REQUEST_NUMBER}}-${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_REPO_NAME}}/services"
+    when:
+      condition:
+        any:
+          isPR: "Number(${{CF_PULL_REQUEST_NUMBER}})"
+  PushChartToHelmRepository:
+    stage: staging
+    title: Push Helm Chart to Repository
+    image: codefresh/cfstep-helm:2.10.0
+    environment:
+      - ACTION=push
+      - CHART_REF=example-voting-app
+    when:
+      branch:
+        only:
+          - master
+  UpgradeStagingRelease:
+    stage: staging
+    title: Upgrading Staging Release
+    image: codefresh/cfstep-helm:2.10.0
+    working_directory: ./
+    environment:
+      - CHART_NAME=h.cfcr.io/dustinvanbuskirk/default/example-voting-app
+      - RELEASE_NAME=example-voting-app
+      - KUBE_CONTEXT=sales-demo@FirstKubernetes
+      - NAMESPACE=dustinvb-staging
+      - DEBUG_CHART=true
+      - custom_result_image_repository=r.cfcr.io/dustinvanbuskirk/example-voting-app/result
+      - custom_result_image_tag=master-${{CF_SHORT_REVISION}}
+      - custom_result_image_pullSecret=codefresh-generated-r.cfcr.io-cfcr-dustinvb-staging
+      - custom_vote_image_repository=r.cfcr.io/dustinvanbuskirk/example-voting-app/vote
+      - custom_vote_image_tag=master-${{CF_SHORT_REVISION}}
+      - custom_vote_image_pullSecret=codefresh-generated-r.cfcr.io-cfcr-dustinvb-staging
+      - custom_worker_image_repository=r.cfcr.io/dustinvanbuskirk/example-voting-app/worker
+      - custom_worker_image_tag=master-${{CF_SHORT_REVISION}}
+      - custom_worker_image_pullSecret=codefresh-generated-r.cfcr.io-cfcr-dustinvb-staging
+    when:
+      branch:
+        only:
+          - master
+  RunStagingDVTs:
+    stage: staging
+    title: Running DVTS on Staging Release
+    image: 'codefresh/cli:latest'
+    commands:
+      - codefresh run dustinvanbuskirk/example-voting-app/dvts -b='${{CF_BRANCH}}' -s='${{CF_REVISION}}' -v KUBE_CONTEXT=sales-demo -v NAMESPACE=dustinvb-staging -v SERVICES='vote result' -v RELEASE_NAME='example-voting-app' -v TEST_IMAGE='example-voting-app/tests:master-${{CF_SHORT_REVISION}}'
+    when:
+      branch:
+        only:
+          - master
+  NotifySlackChannelStaging:
+    title: Sending Slack Notification for Staging Upgrade
+    image: cloudposse/slack-notifier
+    environment:
+      - SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+      - SLACK_USER_NAME=codefresh
+      - SLACK_ICON_EMOJI=":codefresh:"
+      - SLACK_TITLE="Staging Upgraded to ${{CF_BRANCH_TAG_NORMALIZED}}"
+      - SLACK_TITLE_LINK="https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/example-voting-app/services" 
+    when:
+      branch:
+        only:
+          - master
+  UpgradeProductionRelease:
+    stage: production
+    title: Upgrading Production Release
+    image: codefresh/cfstep-helm:2.10.0
+    working_directory: ./
+    environment:
+      - CHART_NAME=h.cfcr.io/dustinvanbuskirk/default/example-voting-app
+      - RELEASE_NAME=example-voting-app
+      - KUBE_CONTEXT=sales-prod@FirstKubernetes
+      - NAMESPACE=dustinvb-production
+      - DEBUG_CHART=true
+      - custom_result_image_repository=r.cfcr.io/dustinvanbuskirk/example-voting-app/result
+      - custom_result_image_tag=master-${{CF_SHORT_REVISION}}
+      - custom_result_image_pullSecret=codefresh-generated-r.cfcr.io-cfcr-dustinvb-production
+      - custom_vote_image_repository=r.cfcr.io/dustinvanbuskirk/example-voting-app/vote
+      - custom_vote_image_tag=master-${{CF_SHORT_REVISION}}
+      - custom_vote_image_pullSecret=codefresh-generated-r.cfcr.io-cfcr-dustinvb-production
+      - custom_worker_image_repository=r.cfcr.io/dustinvanbuskirk/example-voting-app/worker
+      - custom_worker_image_tag=master-${{CF_SHORT_REVISION}}
+      - custom_worker_image_pullSecret=codefresh-generated-r.cfcr.io-cfcr-dustinvb-production
+    when:
+      condition:
+        all:
+          semverTag: 'match("${{CF_BRANCH}}", "^v([0-9]+)([.][0-9]+){1,2}$", true) == true'
+          masterBranch: '"${{CF_BASE_BRANCH}}" == "master"'
+  RunProductionDVTs:
+    stage: production
+    title: Running DVTS on Production Release
+    image: 'codefresh/cli:latest'
+    commands:
+      - codefresh run dustinvanbuskirk/example-voting-app/dvts -b='${{CF_BRANCH}}' -s='${{CF_REVISION}}' -v KUBE_CONTEXT=sales-prod -v NAMESPACE=dustinvb-production -v SERVICES='vote result' -v RELEASE_NAME='example-voting-app' -v TEST_IMAGE='example-voting-app/tests:master-${{CF_SHORT_REVISION}}'
+    when:
+      condition:
+        all:
+          semverTag: 'match("${{CF_BRANCH}}", "^v([0-9]+)([.][0-9]+){1,2}$", true) == true'
+          masterBranch: '"${{CF_BASE_BRANCH}}" == "master"'
+  NotifySlackChannelProduction:
+    title: Sending Slack Notification for Production Upgrade
+    image: cloudposse/slack-notifier
+    environment:
+      - SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+      - SLACK_USER_NAME=codefresh
+      - SLACK_ICON_EMOJI=":codefresh:"
+      - SLACK_TITLE="Production Upgraded to ${{CF_BRANCH_TAG_NORMALIZED}}"
+      - SLACK_TITLE_LINK="https://g.codefresh.io/helm/releases/sales-demo@FirstKubernetes/kube-system/example-voting-app/services"
+    when:
+      condition:
+        all:
+          semverTag: 'match("${{CF_BRANCH}}", "^v([0-9]+)([.][0-9]+){1,2}$", true) == true'
+          masterBranch: '"${{CF_BASE_BRANCH}}" == "master"' 
