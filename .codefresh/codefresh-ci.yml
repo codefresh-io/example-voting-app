@@ -42,7 +42,7 @@ steps:
     title: Test
     image: alpine
     commands:
-      - echo ${{CF_PULL_REQUEST_NUMBER}}
+      - echo ${{CF_PULL_REQUEST_ACTION}}
   NotifyGitHubPREnvCreating:
     title: Set Pull Request Environment pending
     image: cloudposse/github-status-updater
@@ -59,7 +59,7 @@ steps:
     when:
       condition:
         any:
-          isPR: "'${{CF_PULL_REQUEST_NUMBER}}' != ''"
+          isPR: "'${{CF_PULL_REQUEST_ACTION}}' != 'CF_PULL_REQUEST_ACTION'"
   DeployPRRelease:
     stage: pullrequest
     title: Create Ephemeral Helm Release for Pull Request
